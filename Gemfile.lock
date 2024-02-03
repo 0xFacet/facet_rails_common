@@ -1,0 +1,19 @@
+PATH
+  remote: .
+  specs:
+    facet_rails_common (0.1.0)
+
+GEM
+  remote: https://rubygems.org/
+  specs:
+    rake (13.1.0)
+
+PLATFORMS
+  arm64-darwin-20
+
+DEPENDENCIES
+  facet_rails_common!
+  rake (~> 13.0)
+
+BUNDLED WITH
+   2.4.14
