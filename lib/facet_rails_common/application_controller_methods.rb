@@ -69,6 +69,10 @@ module FacetRailsCommon::ApplicationControllerMethods
   end
   
   def cache_on_block(etag: nil, max_age: 6.seconds, cache_forever_with: nil, &block)
+    unless defined?(EthBlock)
+      return set_cache_control_headers(max_age: max_age, etag: etag, &block)
+    end
+    
     if cache_forever_with
       current = EthBlock.cached_global_block_number
       diff = current - cache_forever_with
