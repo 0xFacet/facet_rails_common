@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "facet_rails_common/version"
-require_relative "facet_rails_common/numbers_to_string"
+require_relative "facet_rails_common/numbers_to_strings"
 require_relative "facet_rails_common/application_controller_methods"
 
 if defined?(FacetVmClient)
