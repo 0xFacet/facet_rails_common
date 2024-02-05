@@ -1,5 +1,6 @@
 module ::FacetVmClient
   include FacetRailsCommon::NumbersToStrings
+  extend FacetRailsCommon::NumbersToStrings
   
   class StaticCallError < StandardError; end
   
