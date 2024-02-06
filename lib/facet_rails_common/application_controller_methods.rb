@@ -1,4 +1,6 @@
 module FacetRailsCommon::ApplicationControllerMethods
+  include FacetRailsCommon::NumbersToStrings
+  
   class ::RequestedRecordNotFound < StandardError; end
 
   def self.included(base)
@@ -73,7 +75,7 @@ module FacetRailsCommon::ApplicationControllerMethods
       return set_cache_control_headers(max_age: max_age, etag: etag, &block)
     end
     
-    if cache_forever_with
+    if cache_forever_with && EthBlock.respond_to?(:cached_global_block_number)
       current = EthBlock.cached_global_block_number
       diff = current - cache_forever_with
       max_age = [max_age, 1.day].max if diff > 64
@@ -93,33 +95,6 @@ module FacetRailsCommon::ApplicationControllerMethods
     response.headers['Vary'] = 'Authorization'
     
     yield if stale?(etag: versioned_etag, public: true)
-  end
-  
-  def numbers_to_strings(result)
-    result = result.as_json
-
-    case result
-    when String
-      format_decimal_or_string(result)
-    when Numeric
-      result.to_s
-    when Hash
-      result.deep_transform_values { |value| numbers_to_strings(value) }
-    when Array
-      result.map { |value| numbers_to_strings(value) }
-    else
-      result
-    end
-  end
-  
-  def format_decimal_or_string(str)
-    dec = BigDecimal(str)
-    
-    return str unless dec.to_s == str
-    
-    (dec.frac.zero? ? dec.to_i : dec).to_s
-  rescue ArgumentError
-    str
   end
   
   def record_not_found
