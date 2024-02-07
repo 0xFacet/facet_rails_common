@@ -94,7 +94,7 @@ module ::FacetVmClient
       { error: e.message }
     end
     
-    res.with_indifferent_access
+    res.respond_to?(:with_indifferent_access) ? res.with_indifferent_access : res
   end
   
   def self.bearer_token
