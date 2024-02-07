@@ -46,8 +46,8 @@ module ::FacetVmClient
   end
   
   def self.batch_call(*call_params)
-    promises = call_params.map do |param|
-      Concurrent::Promise.execute do
+    futures = call_params.map do |param|
+      Concurrent::Future.execute do
         static_call(
           contract: param[:contract],
           function: param[:function],
@@ -56,7 +56,7 @@ module ::FacetVmClient
       end
     end
 
-    Concurrent::Promise.zip(*promises).value
+    futures.map(&:value!)
   end
   
   def self.make_request_with_pagination(url, query = {}, method: :get, post_body: nil, timeout: 5, max_results: nil)
