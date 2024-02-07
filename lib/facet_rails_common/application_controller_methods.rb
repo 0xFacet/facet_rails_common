@@ -87,14 +87,18 @@ module FacetRailsCommon::ApplicationControllerMethods
   end
   
   def set_cache_control_headers(max_age:, etag: nil)
-    version = Rails.cache.fetch("etag-version") { rand }
-    addition = ActionController::Base.perform_caching ? '' : rand
-    versioned_etag = expand_cache_key([etag, version, addition])
-    
     expires_in(max_age, public: true)
     response.headers['Vary'] = 'Authorization'
     
-    yield if stale?(etag: versioned_etag, public: true)
+    if etag
+      version = Rails.cache.fetch("etag-version") { rand }
+      addition = ActionController::Base.perform_caching ? '' : rand
+      versioned_etag = expand_cache_key([etag, version, addition])
+      
+      yield if stale?(etag: versioned_etag, public: true)
+    else
+      yield
+    end
   end
   
   def record_not_found
