@@ -14,6 +14,11 @@ module ::FacetVmClient
     end
   end
   
+  def self.get_contract(contract)
+    url = "#{base_url}/contracts/#{contract}"
+    make_request(url)['result']
+  end
+
   def self.get_transaction(tx_hash)
     url = "#{base_url}/transactions/#{tx_hash}"
     res = make_request(url)['result']
