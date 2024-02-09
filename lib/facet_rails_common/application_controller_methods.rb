@@ -27,7 +27,15 @@ module FacetRailsCommon::ApplicationControllerMethods
   end
   
   def paginate(scope, results_limit: 50)
-    sort_order = params[:sort_order]&.downcase == "asc" ? :oldest_first : :newest_first
+    sort_by = if params[:sort_by].present? && scope.respond_to?(params[:sort_by])
+      params[:sort_by]
+    else
+      'newest_first'
+    end
+    
+    if params[:reverse].present?
+      sort_by += "_reverse"
+    end
 
     max_results = (params[:max_results] || 25).to_i.clamp(1, results_limit)
 
@@ -35,12 +43,12 @@ module FacetRailsCommon::ApplicationControllerMethods
       max_results = params[:max_results].to_i
     end
     
-    scope = scope.public_send(sort_order)
+    scope = scope.public_send(sort_by)
     
     starting_item = scope.model.find_by_page_key(params[:page_key])
 
     if starting_item
-      scope = starting_item.public_send(sort_order, scope).after
+      scope = starting_item.public_send(sort_by, scope).after
     end
 
     results = scope.limit(max_results + 1).to_a
@@ -54,7 +62,7 @@ module FacetRailsCommon::ApplicationControllerMethods
       has_more: has_more
     }
     
-    [results, pagination_response, sort_order]
+    [results, pagination_response, sort_by]
   end
 
   def authorized?
