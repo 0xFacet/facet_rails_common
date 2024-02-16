@@ -95,7 +95,8 @@ module FacetRailsCommon::ApplicationControllerMethods
   end
   
   def set_cache_control_headers(max_age:, etag: nil)
-    expires_in(max_age, public: true)
+    expires_in(0, "s-maxage": max_age, public: true)
+    
     response.headers['Vary'] = 'Authorization'
     
     if etag
