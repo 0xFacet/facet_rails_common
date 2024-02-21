@@ -50,6 +50,17 @@ module ::FacetVmClient
     end
   end
   
+  def self.storage_get(contract:, function:, args: nil)
+    url = "#{base_url}/contracts/#{contract}/storage-get/#{function}"
+    res = make_request(url, { args: numbers_to_strings(args).to_json })
+  
+    if res["error"]
+      raise StaticCallError.new(res["error"].strip)
+    else
+      res["result"]
+    end
+  end
+  
   def self.batch_call(*call_params)
     futures = call_params.map do |param|
       Concurrent::Future.execute do
