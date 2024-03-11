@@ -26,7 +26,7 @@ module ::FacetVmClient
   
   def self.get_transactions(allow_cached: true, **kwargs)
     url = "#{base_url}/transactions"
-    make_request_with_pagination(url, allow_cached: allow_cached, **kwargs)
+    make_request_with_pagination(url, kwargs, allow_cached: allow_cached)
   end
 
   def self.get_status(allow_cached: true)
@@ -36,7 +36,7 @@ module ::FacetVmClient
   
   def self.get_historical_token_state(contract, allow_cached: true, **kwargs)
     url = "#{base_url}/tokens/#{contract}/historical_token_state"
-    make_request(url, allow_cached: allow_cached, **kwargs)['result']
+    make_request(url, kwargs, allow_cached: allow_cached)['result']
   end
   
   def self.static_call(contract:, function:, args: nil, allow_cached: true)
