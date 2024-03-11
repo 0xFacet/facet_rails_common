@@ -1,16 +1,25 @@
 module FacetRailsCommon::ApplicationControllerMethods
+  extend ActiveSupport::Concern
   include FacetRailsCommon::NumbersToStrings
   
   class ::RequestedRecordNotFound < StandardError; end
 
-  def self.included(base)
-    base.before_action :authorize_all_requests_if_required
-    base.around_action :use_read_only_database_if_available
-    base.rescue_from ::RequestedRecordNotFound, with: :record_not_found
-    base.delegate :expand_cache_key, to: ActiveSupport::Cache
+  included do
+    before_action :authorize_all_requests_if_required
+    around_action :use_read_only_database_if_available
+    rescue_from ::RequestedRecordNotFound, with: :record_not_found
+    delegate :expand_cache_key, to: ActiveSupport::Cache
   end
   
-  private
+  class_methods do
+    def cache_actions_on_block(**options)
+      around_action(**options.slice(:only, :except)) do |controller, action_block|
+        controller.cache_on_block(**options.except(:only, :except)) do
+          action_block.call
+        end
+      end
+    end
+  end
   
   def parse_param_array(param, limit: 100)
     Array(param).map(&:to_s).map do |param|
@@ -78,35 +87,44 @@ module FacetRailsCommon::ApplicationControllerMethods
     false
   end
   
-  def cache_on_block(etag: nil, max_age: 6.seconds, cache_forever_with: nil, &block)
+  def cache_on_block(etag: nil, max_age: 6.seconds, s_max_age: nil, cache_forever_with: nil, &block)
     unless defined?(EthBlock)
-      return set_cache_control_headers(max_age: max_age, etag: etag, &block)
+      return set_cache_control_headers(max_age: max_age, s_max_age: s_max_age, etag: etag, &block)
     end
     
     if cache_forever_with && EthBlock.respond_to?(:cached_global_block_number)
       current = EthBlock.cached_global_block_number
       diff = current - cache_forever_with
-      max_age = [max_age, 1.day].max if diff > 64
-    end
+      
+      if diff > 64
+        max_age = [max_age, 1.hour].max
+        s_max_age = [s_max_age, 1.day].max
+      end
+    end   
     
     etag_components = [EthBlock.most_recently_imported_blockhash, etag]
     
-    set_cache_control_headers(max_age: max_age, etag: etag_components, &block)
+    set_cache_control_headers(max_age: max_age, s_max_age: s_max_age, etag: etag_components, &block)
   end
   
-  def set_cache_control_headers(max_age:, etag: nil)
-    expires_in(0, "s-maxage": max_age, public: true)
+  def set_cache_control_headers(max_age:, s_max_age: nil, etag: nil)
+    params = { public: true }
+    params['s-maxage'] = s_max_age if s_max_age.present?
+    
+    expires_in(max_age, **params)
     
     response.headers['Vary'] = 'Authorization'
     
-    if etag
-      version = Rails.cache.fetch("etag-version") { rand }
-      addition = ActionController::Base.perform_caching ? '' : rand
-      versioned_etag = expand_cache_key([etag, version, addition])
-      
-      yield if stale?(etag: versioned_etag, public: true)
+    if block_given?
+      if etag
+        version = Rails.cache.fetch("etag-version") { rand }
+        
+        yield if stale?(etag: expand_cache_key(etag, version), public: true)
+      else
+        yield
+      end
     else
-      yield
+      raise "Need block if etag is set" if etag
     end
   end
   
