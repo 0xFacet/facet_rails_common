@@ -14,34 +14,34 @@ module ::FacetVmClient
     end
   end
   
-  def self.get_contract(contract, allow_cached: true)
+  def self.get_contract(contract, force_short_cache: false)
     url = "#{base_url}/contracts/#{contract}"
-    make_request(url, {}, allow_cached: allow_cached)['result']
+    make_request(url, {}, force_short_cache: force_short_cache)['result']
   end
 
-  def self.get_transaction(tx_hash, allow_cached: true)
+  def self.get_transaction(tx_hash, force_short_cache: false)
     url = "#{base_url}/transactions/#{tx_hash}"
-    make_request(url, {}, allow_cached: allow_cached)['result']
+    make_request(url, {}, force_short_cache: force_short_cache)['result']
   end
   
-  def self.get_transactions(allow_cached: true, **kwargs)
+  def self.get_transactions(force_short_cache: false, **kwargs)
     url = "#{base_url}/transactions"
-    make_request_with_pagination(url, kwargs, allow_cached: allow_cached)
+    make_request_with_pagination(url, kwargs, force_short_cache: force_short_cache)
   end
 
-  def self.get_status(allow_cached: true)
+  def self.get_status(force_short_cache: false)
     url = "#{base_url}/status"
-    make_request(url, {}, allow_cached: allow_cached).deep_transform_values(&:to_i)
+    make_request(url, {}, force_short_cache: force_short_cache).deep_transform_values(&:to_i)
   end
   
-  def self.get_historical_token_state(contract, allow_cached: true, **kwargs)
+  def self.get_historical_token_state(contract, force_short_cache: false, **kwargs)
     url = "#{base_url}/tokens/#{contract}/historical_token_state"
-    make_request(url, kwargs, allow_cached: allow_cached)['result']
+    make_request(url, kwargs, force_short_cache: force_short_cache)['result']
   end
   
-  def self.static_call(contract:, function:, args: nil, allow_cached: true)
+  def self.static_call(contract:, function:, args: nil, force_short_cache: false)
     url = "#{base_url}/contracts/#{contract}/static-call/#{function}"
-    res = make_request(url, { args: numbers_to_strings(args).to_json }, allow_cached: allow_cached)
+    res = make_request(url, { args: numbers_to_strings(args).to_json }, force_short_cache: force_short_cache)
     if res["error"]
       raise StaticCallError.new(res["error"].strip)
     else
@@ -49,9 +49,9 @@ module ::FacetVmClient
     end
   end
   
-  def self.storage_get(contract:, function:, args: nil, allow_cached: true)
+  def self.storage_get(contract:, function:, args: nil, force_short_cache: false)
     url = "#{base_url}/contracts/#{contract}/storage-get/#{function}"
-    res = make_request(url, { args: numbers_to_strings(args).to_json }, allow_cached: allow_cached)
+    res = make_request(url, { args: numbers_to_strings(args).to_json }, force_short_cache: force_short_cache)
     if res["error"]
       raise StaticCallError.new(res["error"].strip)
     else
@@ -59,25 +59,25 @@ module ::FacetVmClient
     end
   end
   
-  def self.batch_call(*call_params, allow_cached: true)
+  def self.batch_call(*call_params, force_short_cache: false)
     futures = call_params.map do |param|
       Concurrent::Future.execute do
         static_call(
           contract: param[:contract],
           function: param[:function],
           args: param[:args],
-          allow_cached: allow_cached
+          force_short_cache: force_short_cache
         )
       end
     end
     futures.map(&:value!)
   end
   
-  def self.make_request_with_pagination(url, query = {}, method: :get, post_body: nil, timeout: 5, max_results: nil, allow_cached: true)
+  def self.make_request_with_pagination(url, query = {}, method: :get, post_body: nil, timeout: 5, max_results: nil, force_short_cache: false)
     results = []
     page_key = nil
     loop do
-      response = make_request(url, query.merge(page_key: page_key), method: method, post_body: post_body, timeout: timeout, allow_cached: allow_cached)
+      response = make_request(url, query.merge(page_key: page_key), method: method, post_body: post_body, timeout: timeout, force_short_cache: force_short_cache)
       results.concat(response['result'])
       break if !response['pagination']['has_more'] || (max_results && results.size >= max_results)
       page_key = response['pagination']['page_key']
@@ -85,10 +85,10 @@ module ::FacetVmClient
     results
   end
   
-  def self.make_request(url, query = {}, method: :get, post_body: nil, timeout: 5, allow_cached: true)
+  def self.make_request(url, query = {}, method: :get, post_body: nil, timeout: 5, force_short_cache: false)
     headers = {}
     headers['Authorization'] = "Bearer #{bearer_token}" if bearer_token
-    headers['Cache-Control'] = 'no-cache' unless allow_cached
+    query[:_short_cache] = 't' if force_short_cache
     
     query.merge!(user_cursor_pagination: true) if method == :get
         
