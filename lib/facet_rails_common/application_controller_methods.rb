@@ -5,6 +5,7 @@ module FacetRailsCommon::ApplicationControllerMethods
   class ::RequestedRecordNotFound < StandardError; end
 
   included do
+    before_action :authorize_short_cache
     before_action :authorize_all_requests_if_required
     around_action :use_read_only_database_if_available
     rescue_from ::RequestedRecordNotFound, with: :record_not_found
@@ -35,8 +36,21 @@ module FacetRailsCommon::ApplicationControllerMethods
     scope
   end
   
+  def valid_order_query?(name, model)
+    return unless name.present?
+    
+    methods = [
+      name,
+      "#{name}_reverse",
+      "#{name}_at", 
+      "#{name}_space"
+    ]
+    
+    methods.all? { |method| model.respond_to?(method) }
+  end
+  
   def paginate(scope, results_limit: 50)
-    sort_by = if params[:sort_by].present? && scope.respond_to?(params[:sort_by])
+    sort_by = if valid_order_query?(params[:sort_by], scope.model)
       params[:sort_by]
     else
       'newest_first'
@@ -108,6 +122,11 @@ module FacetRailsCommon::ApplicationControllerMethods
   end
   
   def set_cache_control_headers(max_age:, s_max_age: nil, etag: nil)
+    if short_cache?
+      max_age = 1.second
+      s_max_age = nil
+    end
+    
     params = { public: true }
     params['s-maxage'] = s_max_age if s_max_age.present?
     
@@ -130,6 +149,16 @@ module FacetRailsCommon::ApplicationControllerMethods
   
   def record_not_found
     render json: { error: "Not found" }, status: 404
+  end
+  
+  def short_cache?
+    params[:_short_cache].present?
+  end
+  
+  def authorize_short_cache
+    if short_cache? && !authorized?
+      render json: { error: "Unauthorized" }, status: :unauthorized
+    end
   end
   
   def authorize_all_requests_if_required
