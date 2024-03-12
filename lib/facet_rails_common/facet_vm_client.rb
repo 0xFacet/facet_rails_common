@@ -88,7 +88,7 @@ module ::FacetVmClient
   def self.make_request(url, query = {}, method: :get, post_body: nil, timeout: 5, force_short_cache: false)
     headers = {}
     headers['Authorization'] = "Bearer #{bearer_token}" if bearer_token
-    query[:_short_cache] = 't' if force_short_cache
+    query[:_short_cache] = 't' if (force_short_cache && bearer_token)
     
     query.merge!(user_cursor_pagination: true) if method == :get
         
