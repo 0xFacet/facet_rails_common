@@ -36,21 +36,8 @@ module FacetRailsCommon::ApplicationControllerMethods
     scope
   end
   
-  def valid_order_query?(name, model)
-    return unless name.present?
-    
-    methods = [
-      name,
-      "#{name}_reverse",
-      "#{name}_at", 
-      "#{name}_space"
-    ]
-    
-    methods.all? { |method| model.respond_to?(method) }
-  end
-  
   def paginate(scope, results_limit: 50)
-    sort_by = if valid_order_query?(params[:sort_by], scope.model)
+    sort_by = if scope.model.valid_order_query_scope?(params[:sort_by])
       params[:sort_by]
     else
       'newest_first'

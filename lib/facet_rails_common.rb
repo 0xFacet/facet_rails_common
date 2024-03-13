@@ -13,5 +13,7 @@ end
 
 require_relative "facet_rails_common/facet_vm_client"
 
+require "facet_rails_common/order_query"
+
 module FacetRailsCommon
 end
