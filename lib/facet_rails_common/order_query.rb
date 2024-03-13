@@ -16,6 +16,7 @@ module FacetRailsCommon::OrderQuery
     end
     
     def valid_order_query_scope?(name)
+      return false unless name.present?
       order_query_scopes.include?(name.to_sym)
     end
   end
