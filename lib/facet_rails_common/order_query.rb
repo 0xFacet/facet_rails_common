@@ -38,6 +38,8 @@ module FacetRailsCommon::OrderQuery
 
     # Unified find_by_page_key method based on class-wide key attributes
     def find_by_page_key(key)
+      return unless key.present?
+      
       key_values = key.split("-")
       key_hash = page_key_attributes.zip(key_values).to_h
       find_by(key_hash)
