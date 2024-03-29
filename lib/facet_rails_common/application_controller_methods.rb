@@ -29,23 +29,26 @@ module FacetRailsCommon::ApplicationControllerMethods
   end
   
   def filter_by_params(scope, *param_names)
-    param_names.each do |param_name|
+    valid_columns = scope.model.column_names
+    
+    valid_param_names = param_names.select do |name|
+      valid_columns.include?(name.to_s)
+    end
+    
+    valid_param_names.each do |param_name|
       param_values = parse_param_array(params[param_name])
       scope = param_values.present? ? scope.where(param_name => param_values) : scope
     end
+    
     scope
   end
   
   def paginate(scope, results_limit: 50)
-    sort_by = if scope.model.valid_order_query_scope?(params[:sort_by])
-      params[:sort_by]
-    else
-      'newest_first'
-    end
+    sort_by = scope.model.valid_order_query_scope_or_default(params[:sort_by], 'newest_first')
     
-    if params[:reverse].present?
-      sort_by += "_reverse"
-    end
+    reverse = params[:reverse]&.downcase == 'true'
+    
+    sort_by += "_reverse" if reverse
 
     max_results = (params[:max_results] || 25).to_i.clamp(1, results_limit)
 
@@ -58,7 +61,10 @@ module FacetRailsCommon::ApplicationControllerMethods
     starting_item = scope.model.find_by_page_key(params[:page_key])
 
     if starting_item
-      scope = starting_item.public_send(sort_by, scope).after
+      scope = starting_item.public_send(sort_by.delete_suffix('_reverse'), scope).side(
+        reverse ? :before : :after,
+        true
+      )
     end
 
     results = scope.limit(max_results + 1).to_a
@@ -88,30 +94,29 @@ module FacetRailsCommon::ApplicationControllerMethods
     false
   end
   
-  def cache_on_block(etag: nil, max_age: 6.seconds, s_max_age: nil, cache_forever_with: nil, &block)
-    unless defined?(EthBlock)
-      return set_cache_control_headers(max_age: max_age, s_max_age: s_max_age, etag: etag, &block)
+  def cache_on_block(etag: nil, max_age: 6.seconds, s_max_age: nil, extend_cache_if_block_final: nil, &block)
+    etag_value = if defined?(EthBlock) && EthBlock.respond_to?(:most_recently_imported_blockhash)
+      [EthBlock.most_recently_imported_blockhash, etag]
+    else
+      etag
     end
-    
-    if cache_forever_with && EthBlock.respond_to?(:cached_global_block_number)
-      current = EthBlock.cached_global_block_number
-      diff = current - cache_forever_with
-      
-      if diff > 64
-        max_age = [max_age, 1.hour].max
-        s_max_age = [s_max_age, 1.day].max
-      end
-    end   
-    
-    etag_components = [EthBlock.most_recently_imported_blockhash, etag]
-    
-    set_cache_control_headers(max_age: max_age, s_max_age: s_max_age, etag: etag_components, &block)
+  
+    set_cache_control_headers(
+      max_age: max_age,
+      s_max_age: s_max_age,
+      etag: etag_value,
+      extend_cache_if_block_final: extend_cache_if_block_final,
+      &block
+    )
   end
   
-  def set_cache_control_headers(max_age:, s_max_age: nil, etag: nil)
+  def set_cache_control_headers(max_age:, s_max_age: nil, etag: nil, extend_cache_if_block_final: nil)
     if short_cache?
       max_age = 1.second
       s_max_age = nil
+    elsif extend_cache_if_block_final.present? && block_final?(extend_cache_if_block_final)
+      max_age = [max_age, 1.hour].max
+      s_max_age = [s_max_age, 1.day].max
     end
     
     params = { public: true }
@@ -132,6 +137,20 @@ module FacetRailsCommon::ApplicationControllerMethods
     else
       raise "Need block if etag is set" if etag
     end
+  end
+  
+  def block_final?(resource_or_block_number)
+    unless resource_or_block_number.present? && EthBlock.respond_to?(:cached_global_block_number)
+      return false
+    end
+    
+    if resource_or_block_number.respond_to?(:block_number)
+      resource_or_block_number = resource_or_block_number.block_number
+    end
+    
+    diff = EthBlock.cached_global_block_number - resource_or_block_number
+    
+    diff > 100
   end
   
   def record_not_found

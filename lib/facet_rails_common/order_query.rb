@@ -36,6 +36,13 @@ module FacetRailsCommon::OrderQuery
       order_query_scopes.include?(name.to_sym)
     end
 
+    def valid_order_query_scope_or_default(scope, default)
+      return scope if valid_order_query_scope?(scope)
+      return default if valid_order_query_scope?(default)
+      
+      order_query_scopes.first
+    end
+
     # Unified find_by_page_key method based on class-wide key attributes
     def find_by_page_key(key)
       return unless key.present?
