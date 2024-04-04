@@ -81,6 +81,15 @@ module FacetRailsCommon::ApplicationControllerMethods
     [results, pagination_response, sort_by]
   end
 
+  def render_paginated_json(scope)
+    results, pagination_response = paginate(scope)
+    
+    render json: {
+      result: numbers_to_strings(results),
+      pagination: pagination_response
+    }
+  end
+
   def authorized?
     authorization_header = request.headers['Authorization']
     return false if authorization_header.blank?
