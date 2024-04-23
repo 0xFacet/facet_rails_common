@@ -73,7 +73,7 @@ module ::FacetVmClient
     futures.map(&:value!)
   end
   
-  def self.make_request_with_pagination(url, query = {}, method: :get, post_body: nil, timeout: 5, max_results: nil, force_short_cache: false)
+  def self.make_request_with_pagination(url, query = {}, method: :get, post_body: nil, timeout: 30, max_results: nil, force_short_cache: false)
     results = []
     page_key = nil
     loop do
@@ -85,7 +85,7 @@ module ::FacetVmClient
     results
   end
   
-  def self.make_request(url, query = {}, method: :get, post_body: nil, timeout: 5, force_short_cache: false)
+  def self.make_request(url, query = {}, method: :get, post_body: nil, timeout: 30, force_short_cache: false)
     headers = {}
     headers['Authorization'] = "Bearer #{bearer_token}" if bearer_token
     query[:_short_cache] = 't' if (force_short_cache && bearer_token)
