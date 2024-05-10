@@ -137,7 +137,7 @@ module FacetRailsCommon::ApplicationControllerMethods
     
     if block_given?
       if etag
-        version = Rails.cache.fetch("etag-version") { rand }
+        version = ENV['ETAG_VERSION'] || Rails.cache.fetch("etag-version") { rand }
         
         yield if stale?(etag: expand_cache_key(etag, version), public: true)
       else
