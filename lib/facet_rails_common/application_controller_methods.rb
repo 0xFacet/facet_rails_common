@@ -103,7 +103,7 @@ module FacetRailsCommon::ApplicationControllerMethods
     false
   end
   
-  def cache_on_block(etag: nil, max_age: 6.seconds, s_max_age: nil, extend_cache_if_block_final: nil, &block)
+  def cache_on_block(etag: nil, max_age: 6.seconds, s_max_age: 12.seconds, extend_cache_if_block_final: nil, &block)
     etag_value = if defined?(EthBlock) && EthBlock.respond_to?(:most_recently_imported_blockhash)
       [EthBlock.most_recently_imported_blockhash, etag]
     else
