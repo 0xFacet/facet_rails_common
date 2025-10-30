@@ -1,3 +1,5 @@
+require "base64"
+
 class ::DataUri
   REGEXP = %r{
     \Adata:
@@ -42,26 +44,24 @@ class ::DataUri
   end
 
   def validate_base64_content
-    if base64?
-      begin
-        Base64.strict_decode64(data)
-      rescue ArgumentError
-        raise ArgumentError, 'malformed base64 content'
-      end
-    end
+    return unless claims_to_be_base64?
+
+    raise ArgumentError, 'malformed base64 content' unless data_valid_base64?
   end
 
   def mediatype
     "#{mimetype}#{parameters}"
   end
 
-  def decoded_data
-    return data unless base64?
-
-    Base64.decode64(data)
+  def is_base64?
+    metadata_contains_base64? && data_valid_base64?
   end
   
-  def base64?
+  def decoded_data
+    is_base64? ? base64_decoded_data : data
+  end
+  
+  def claims_to_be_base64?
     !String(extension).empty?
   end
 
@@ -77,13 +77,36 @@ class ::DataUri
     match[:data]
   end
 
+  def data_valid_base64?
+    !base64_decoded_data.nil?
+  end
+
   def parameters
     return [] if String(match[:mimetype]).empty? && String(match[:parameters]).empty?
-  
+
     match[:parameters].split(";").reject(&:empty?)
   end  
   
   def extension
     match[:extension]
+  end
+
+  private
+
+  def base64_decoded_data
+    return @base64_decoded_data if instance_variable_defined?(:@base64_decoded_data)
+
+    @base64_decoded_data = begin
+      Base64.strict_decode64(data)
+    rescue ArgumentError
+      nil
+    end
+  end
+
+  def metadata_contains_base64?
+    header_end = match.begin(:data)
+    return false if header_end.nil?
+
+    uri[0...header_end].downcase.include?("base64")
   end
 end
