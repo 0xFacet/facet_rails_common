@@ -107,6 +107,6 @@ class ::DataUri
     header_end = match.begin(:data)
     return false if header_end.nil?
 
-    uri[0...header_end].downcase.include?("base64")
+    uri[0...header_end].match?(/base64/i)
   end
 end
