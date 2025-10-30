@@ -53,12 +53,12 @@ class ::DataUri
     "#{mimetype}#{parameters}"
   end
 
-  def is_base64?
+  def base64?
     metadata_contains_base64? && data_valid_base64?
   end
   
   def decoded_data
-    is_base64? ? base64_decoded_data : data
+    base64? ? base64_decoded_data : data
   end
   
   def claims_to_be_base64?
