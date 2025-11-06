@@ -85,10 +85,12 @@ class ::DataUri
   end
   
   def json?
-    mimetype.include?('json') || decoded_data.lstrip.start_with?('{', '[')
+    return @_json if instance_variable_defined?(:@_json)
+    
+    @_json = mimetype.include?('json') || decoded_data.lstrip.start_with?('{', '[')
   end
   
-  def parse_json(symbolize_names: false, max_nesting: 200)
+  def parse_json(symbolize_names: false, max_nesting: 100)
     raise ArgumentError, 'not JSON' unless json?
     JSON.parse(decoded_data, symbolize_names: symbolize_names, max_nesting: max_nesting)
   end

@@ -10,6 +10,11 @@ class DataUriTest < Minitest::Test
     assert_equal "Hello", DataUri.new(uri).decoded_data
   end
   
+  def test_implicit_data_uri_keeps_commas_after_first_split
+    du = DataUri.new("data:,hi/bye,yo")
+    assert_equal "hi/bye,yo", du.data
+  end
+  
   def test_implicit_data_uri_defaults_and_decoding
     uri = "data:,Hello"
     du = DataUri.new(uri)
