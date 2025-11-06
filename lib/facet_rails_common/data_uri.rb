@@ -1,4 +1,5 @@
 require "base64"
+require "json"
 
 class ::DataUri
   REGEXP = %r{
@@ -12,16 +13,30 @@ class ::DataUri
     (?<data>.*)
   }x.freeze
 
-  attr_reader :uri, :match
+  attr_reader :mimetype, :parameters, :extension, :data, :uri
 
   def initialize(uri)
-    match = REGEXP.match(uri)
-    raise ArgumentError, 'invalid data URI' unless match
-
     @uri = uri
-    @match = match
-    
-    validate_base64_content
+    @match = REGEXP.match(uri)
+    raise ArgumentError, 'invalid data URI' unless @match
+
+    header_end = @match.begin(:data)
+    header = header_end.nil? ? '' : uri[0...header_end]
+    @header_contains_base64 = !!(header.match?(/base64/i))
+
+    if uri.start_with?('data:,')
+      @match = nil
+      @mimetype = 'text/plain'
+      @parameters = []
+      @extension = nil
+      @data = uri.split(',', 2).last || ''
+    else
+      @mimetype = String(@match[:mimetype]).empty? ? 'text/plain' : @match[:mimetype]
+      @parameters = String(@match[:parameters]).split(';').reject(&:empty?)
+      @extension = @match[:extension]
+      @data = @match[:data]
+      validate_base64_content
+    end
   end
 
   def self.valid?(uri)
@@ -54,7 +69,7 @@ class ::DataUri
   end
 
   def base64?
-    metadata_contains_base64? && data_valid_base64?
+    @header_contains_base64 && data_valid_base64?
   end
   
   def decoded_data
@@ -65,30 +80,19 @@ class ::DataUri
     !String(extension).empty?
   end
 
-  def mimetype
-    if String(match[:mimetype]).empty? || uri.starts_with?("data:,")
-      return 'text/plain'
-    end
-    
-    match[:mimetype]
-  end
-  
-  def data
-    match[:data]
-  end
-
   def data_valid_base64?
     !base64_decoded_data.nil?
   end
-
-  def parameters
-    return [] if String(match[:mimetype]).empty? && String(match[:parameters]).empty?
-
-    match[:parameters].split(";").reject(&:empty?)
-  end  
   
-  def extension
-    match[:extension]
+  def json?
+    return @_json if instance_variable_defined?(:@_json)
+    
+    @_json = mimetype.include?('json') || decoded_data.lstrip.start_with?('{', '[')
+  end
+  
+  def parse_json(symbolize_names: false, max_nesting: 100)
+    raise ArgumentError, 'not JSON' unless json?
+    JSON.parse(decoded_data, symbolize_names: symbolize_names, max_nesting: max_nesting)
   end
 
   private
@@ -101,12 +105,5 @@ class ::DataUri
     rescue ArgumentError
       nil
     end
-  end
-
-  def metadata_contains_base64?
-    header_end = match.begin(:data)
-    return false if header_end.nil?
-
-    uri[0...header_end].match?(/base64/i)
   end
 end
