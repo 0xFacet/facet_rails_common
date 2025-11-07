@@ -58,6 +58,13 @@ class DataUriTest < Minitest::Test
     error = assert_raises(ArgumentError) { DataUri.new(uri) }
     assert_equal "malformed base64 content", error.message
   end
+
+  def test_implicit_form_with_legacy_base64_extension_raises
+    uri = "data:,text/plain;charset=utf-8;base64,8J+Msi50cmVl,"
+
+    error = assert_raises(ArgumentError) { DataUri.new(uri) }
+    assert_equal "malformed base64 content", error.message
+  end
   
   def test_valid_question_mark_true_for_valid_data_uris
     assert DataUri.valid?("data:text/plain,abc")

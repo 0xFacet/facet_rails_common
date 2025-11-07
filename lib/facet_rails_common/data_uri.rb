@@ -23,18 +23,19 @@ class ::DataUri
     header_end = @match.begin(:data)
     header = header_end.nil? ? '' : uri[0...header_end]
     @header_contains_base64 = !!(header.match?(/base64/i))
+    
+    @mimetype = String(@match[:mimetype]).empty? ? 'text/plain' : @match[:mimetype]
+    @parameters = String(@match[:parameters]).split(';').reject(&:empty?)
+    @extension = @match[:extension]
+    @data = @match[:data]
+    
+    validate_base64_content
 
     if uri.start_with?('data:,')
       @mimetype = 'text/plain'
       @parameters = []
       @extension = nil
       @data = uri.split(',', 2).last || ''
-    else
-      @mimetype = String(@match[:mimetype]).empty? ? 'text/plain' : @match[:mimetype]
-      @parameters = String(@match[:parameters]).split(';').reject(&:empty?)
-      @extension = @match[:extension]
-      @data = @match[:data]
-      validate_base64_content
     end
   end
 
