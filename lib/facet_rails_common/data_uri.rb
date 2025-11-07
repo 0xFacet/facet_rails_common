@@ -13,7 +13,7 @@ class ::DataUri
     (?<data>.*)
   }x.freeze
 
-  attr_reader :mimetype, :parameters, :extension, :data, :uri
+  attr_reader :mimetype, :parameters, :extension, :data, :uri, :match
 
   def initialize(uri)
     @uri = uri
@@ -25,7 +25,6 @@ class ::DataUri
     @header_contains_base64 = !!(header.match?(/base64/i))
 
     if uri.start_with?('data:,')
-      @match = nil
       @mimetype = 'text/plain'
       @parameters = []
       @extension = nil
