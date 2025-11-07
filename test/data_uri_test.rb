@@ -65,6 +65,53 @@ class DataUriTest < Minitest::Test
     error = assert_raises(ArgumentError) { DataUri.new(uri) }
     assert_equal "malformed base64 content", error.message
   end
+
+  def test_implicit_form_with_legacy_base64_valid_decodes_and_defaults
+    uri = "data:,text/plain;charset=utf-8;base64,SGVsbG8="
+    du = DataUri.new(uri)
+
+    assert_equal "text/plain", du.mimetype
+    assert_equal [], du.parameters
+    assert_nil du.extension
+    assert_equal "Hello", du.decoded_data
+  end
+
+  def test_valid_question_mark_false_for_implicit_legacy_invalid_base64
+    uri = "data:,text/plain;charset=utf-8;base64,@@@"
+    refute DataUri.valid?(uri)
+  end
+
+  def test_uppercase_base64_param_valid_decodes
+    uri = "data:text/plain;foo=BASE64,SGVsbG8="
+    du = DataUri.new(uri)
+
+    assert du.base64?
+    assert_equal "Hello", du.decoded_data
+  end
+
+  def test_uppercase_base64_param_invalid_returns_original
+    uri = "data:text/plain;foo=BASE64,@@@"
+    du = DataUri.new(uri)
+
+    refute du.data_valid_base64?
+    refute du.base64?
+    assert_equal "@@@", du.decoded_data
+  end
+
+  def test_empty_base64_content_decodes_to_empty_string
+    uri = "data:text/plain;base64,"
+    du = DataUri.new(uri)
+
+    assert_equal "", du.decoded_data
+  end
+
+  def test_no_mimetype_with_base64_defaults_and_decodes
+    uri = "data:;base64,SGVsbG8="
+    du = DataUri.new(uri)
+
+    assert_equal "text/plain", du.mimetype
+    assert_equal "Hello", du.decoded_data
+  end
   
   def test_valid_question_mark_true_for_valid_data_uris
     assert DataUri.valid?("data:text/plain,abc")
