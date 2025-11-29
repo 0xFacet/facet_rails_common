@@ -50,9 +50,11 @@ class ::DataUri
 
   def self.esip6?(uri)
     begin
-      parameters = DataUri.new(uri).parameters
+      data_uri = DataUri.new(uri)
 
-      parameters.include?("rule=esip6")
+      # Use legacy behavior to support Ethscriptions
+      raw_parameters = String(data_uri.match[:parameters]).split(';')
+      raw_parameters.include?("rule=esip6")
     rescue ArgumentError
       false
     end

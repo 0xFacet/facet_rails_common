@@ -151,4 +151,14 @@ class DataUriTest < Minitest::Test
     refute DataUri.esip6?("data:text/plain;rule=other,abc")
     refute DataUri.esip6?("not a data uri")
   end
+
+  def test_esip6_legacy_implicit_form
+    uri = 'data:,text/plain;rule=esip6,{"p":"erc-20","op":"mint","tick":"eths","amt":"1000"}'
+    assert DataUri.esip6?(uri)
+  end
+
+  def test_esip6_legacy_implicit_form_other_rule
+    uri = 'data:,text/plain;rule=other,{"p":"erc-20","op":"mint","tick":"eths","amt":"1000"}'
+    refute DataUri.esip6?(uri)
+  end
 end
