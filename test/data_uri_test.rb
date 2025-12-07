@@ -1,0 +1,200 @@
+# frozen_string_literal: true
+
+require "minitest/autorun"
+require "facet_rails_common/data_uri"
+
+class DataUriTest < Minitest::Test
+  def test_decoded_data_with_base64_extension
+    uri = "data:text/plain;base64,SGVsbG8="
+
+    assert_equal "Hello", DataUri.new(uri).decoded_data
+  end
+  
+  def test_implicit_data_uri_keeps_commas_after_first_split
+    du = DataUri.new("data:,hi/bye,yo")
+    assert_equal "hi/bye,yo", du.data
+  end
+  
+  def test_implicit_data_uri_defaults_and_decoding
+    uri = "data:,Hello"
+    du = DataUri.new(uri)
+    assert_equal "text/plain", du.mimetype
+    assert_equal [], du.parameters
+    assert_nil du.extension
+    assert_equal "Hello", du.data
+    refute du.base64?
+    assert_equal "Hello", du.decoded_data
+  end
+
+  def test_decoded_data_when_metadata_mentions_base64
+    uri = "data:text/plain;foo=base64,SGVsbG8="
+
+    assert_equal "Hello", DataUri.new(uri).decoded_data
+  end
+
+  def test_decoded_data_when_metadata_mentions_base64_in_mime_type
+    uri = "data:application/Base64Something,SGVsbG8="
+
+    assert_equal "Hello", DataUri.new(uri).decoded_data
+  end
+
+  def test_returns_original_data_when_metadata_mentions_base64_but_data_invalid
+    uri = "data:text/plain;foo=base64,@@@"
+    data_uri = DataUri.new(uri)
+
+    refute data_uri.data_valid_base64?
+    assert_equal "@@@", data_uri.decoded_data
+  end
+
+  def test_returns_original_data_when_base64_only_in_payload
+    uri = "data:text/plain,base64SGVsbG8="
+
+    assert_equal "base64SGVsbG8=", DataUri.new(uri).decoded_data
+  end
+
+  def test_invalid_base64_with_extension_raises
+    uri = "data:text/plain;base64,@@@"
+
+    error = assert_raises(ArgumentError) { DataUri.new(uri) }
+    assert_equal "malformed base64 content", error.message
+  end
+
+  def test_implicit_form_with_legacy_base64_extension_raises
+    uri = "data:,text/plain;charset=utf-8;base64,8J+Msi50cmVl,"
+
+    error = assert_raises(ArgumentError) { DataUri.new(uri) }
+    assert_equal "malformed base64 content", error.message
+  end
+
+  def test_implicit_form_with_legacy_base64_valid_decodes_and_defaults
+    uri = "data:,text/plain;charset=utf-8;base64,SGVsbG8="
+    du = DataUri.new(uri)
+
+    assert_equal "text/plain", du.mimetype
+    assert_equal [], du.parameters
+    assert_nil du.extension
+    assert_equal "Hello", du.decoded_data
+  end
+
+  def test_valid_question_mark_false_for_implicit_legacy_invalid_base64
+    uri = "data:,text/plain;charset=utf-8;base64,@@@"
+    refute DataUri.valid?(uri)
+  end
+
+  def test_uppercase_base64_param_valid_decodes
+    uri = "data:text/plain;foo=BASE64,SGVsbG8="
+    du = DataUri.new(uri)
+
+    assert du.base64?
+    assert_equal "Hello", du.decoded_data
+  end
+
+  def test_uppercase_base64_param_invalid_returns_original
+    uri = "data:text/plain;foo=BASE64,@@@"
+    du = DataUri.new(uri)
+
+    refute du.data_valid_base64?
+    refute du.base64?
+    assert_equal "@@@", du.decoded_data
+  end
+
+  def test_empty_base64_content_decodes_to_empty_string
+    uri = "data:text/plain;base64,"
+    du = DataUri.new(uri)
+
+    assert_equal "", du.decoded_data
+  end
+
+  def test_no_mimetype_with_base64_defaults_and_decodes
+    uri = "data:;base64,SGVsbG8="
+    du = DataUri.new(uri)
+
+    assert_equal "text/plain", du.mimetype
+    assert_equal "Hello", du.decoded_data
+  end
+  
+  def test_valid_question_mark_true_for_valid_data_uris
+    assert DataUri.valid?("data:text/plain,abc")
+    assert DataUri.valid?("data:,")
+    assert DataUri.valid?("data:application/json,{\"a\":1}")
+  end
+  
+  def test_valid_question_mark_false_for_non_data_uris
+    refute DataUri.valid?("http://example.com")
+    refute DataUri.valid?("data;not,a,uri")
+  end
+  
+  def test_json_helpers_by_mimetype
+    uri = "data:application/json,{\"a\":1}"
+    du = DataUri.new(uri)
+    assert du.json?
+    assert_equal({"a"=>1}, du.parse_json)
+    assert_equal({a: 1}, du.parse_json(symbolize_names: true))
+  end
+  
+  def test_json_helpers_by_payload_prefix
+    json_b64 = "eyJhIjoxfQ==" # {"a":1}
+    uri = "data:application/octet-stream;base64,#{json_b64}"
+    du = DataUri.new(uri)
+    assert du.json?
+    assert_equal({"a"=>1}, du.parse_json)
+  end
+  
+  def test_parse_json_raises_when_not_json
+    du = DataUri.new("data:text/plain,hello")
+    error = assert_raises(ArgumentError) { du.parse_json }
+    assert_equal "not JSON", error.message
+  end
+  
+  def test_esip6_param_detection
+    assert DataUri.esip6?("data:text/plain;rule=esip6,abc")
+    refute DataUri.esip6?("data:text/plain;rule=other,abc")
+    refute DataUri.esip6?("not a data uri")
+  end
+
+  def test_esip6_legacy_implicit_form
+    uri = 'data:,text/plain;rule=esip6,{"p":"erc-20","op":"mint","tick":"eths","amt":"1000"}'
+    assert DataUri.esip6?(uri)
+  end
+
+  def test_esip6_legacy_implicit_form_other_rule
+    uri = 'data:,text/plain;rule=other,{"p":"erc-20","op":"mint","tick":"eths","amt":"1000"}'
+    refute DataUri.esip6?(uri)
+  end
+
+  def test_decoded_data_percent_decodes_space
+    uri = "data:text/plain,Hello%20World"
+    du = DataUri.new(uri)
+
+    assert_equal "Hello%20World", du.data
+    assert_equal "Hello World", du.decoded_data
+  end
+
+  def test_decoded_data_preserves_plus_sign
+    uri = "data:text/plain,Hello+World"
+    du = DataUri.new(uri)
+
+    assert_equal "Hello+World", du.decoded_data
+  end
+
+  def test_decoded_data_percent_decodes_html
+    uri = "data:text/html,%3Ch1%3EHello%3C%2Fh1%3E"
+    du = DataUri.new(uri)
+
+    assert_equal "<h1>Hello</h1>", du.decoded_data
+  end
+
+  def test_decoded_data_percent_decodes_mixed_content
+    uri = "data:text/plain,a%20b+c%3Dd"
+    du = DataUri.new(uri)
+
+    assert_equal "a b+c=d", du.decoded_data
+  end
+
+  def test_decoded_data_percent_decodes_svg
+    uri = "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3C%2Fsvg%3E"
+    du = DataUri.new(uri)
+
+    assert_equal '<svg xmlns="http://www.w3.org/2000/svg"></svg>', du.decoded_data
+  end
+end

@@ -1,3 +1,7 @@
+require "base64"
+require "json"
+require "uri"
+
 class ::DataUri
   REGEXP = %r{
     \Adata:
@@ -10,16 +14,30 @@ class ::DataUri
     (?<data>.*)
   }x.freeze
 
-  attr_reader :uri, :match
+  attr_reader :mimetype, :parameters, :extension, :data, :uri, :match
 
   def initialize(uri)
-    match = REGEXP.match(uri)
-    raise ArgumentError, 'invalid data URI' unless match
-
     @uri = uri
-    @match = match
+    @match = REGEXP.match(uri)
+    raise ArgumentError, 'invalid data URI' unless @match
+
+    header_end = @match.begin(:data)
+    header = header_end.nil? ? '' : uri[0...header_end]
+    @header_contains_base64 = !!(header.match?(/base64/i))
+    
+    @mimetype = String(@match[:mimetype]).empty? ? 'text/plain' : @match[:mimetype]
+    @parameters = String(@match[:parameters]).split(';').reject(&:empty?)
+    @extension = @match[:extension]
+    @data = @match[:data]
     
     validate_base64_content
+
+    if uri.start_with?('data:,')
+      @mimetype = 'text/plain'
+      @parameters = []
+      @extension = nil
+      @data = uri.split(',', 2).last || ''
+    end
   end
 
   def self.valid?(uri)
@@ -33,57 +51,62 @@ class ::DataUri
 
   def self.esip6?(uri)
     begin
-      parameters = DataUri.new(uri).parameters
+      data_uri = DataUri.new(uri)
 
-      parameters.include?("rule=esip6")
+      # Use legacy behavior to support Ethscriptions
+      raw_parameters = String(data_uri.match[:parameters]).split(';')
+      raw_parameters.include?("rule=esip6")
     rescue ArgumentError
       false
     end
   end
 
   def validate_base64_content
-    if base64?
-      begin
-        Base64.strict_decode64(data)
-      rescue ArgumentError
-        raise ArgumentError, 'malformed base64 content'
-      end
-    end
+    return unless claims_to_be_base64?
+
+    raise ArgumentError, 'malformed base64 content' unless data_valid_base64?
   end
 
   def mediatype
     "#{mimetype}#{parameters}"
   end
 
-  def decoded_data
-    return data unless base64?
-
-    Base64.decode64(data)
+  def base64?
+    @header_contains_base64 && data_valid_base64?
   end
   
-  def base64?
+  def decoded_data
+    base64? ? base64_decoded_data : URI::DEFAULT_PARSER.unescape(data)
+  end
+  
+  def claims_to_be_base64?
     !String(extension).empty?
   end
 
-  def mimetype
-    if String(match[:mimetype]).empty? || uri.starts_with?("data:,")
-      return 'text/plain'
-    end
-    
-    match[:mimetype]
+  def data_valid_base64?
+    !base64_decoded_data.nil?
   end
   
-  def data
-    match[:data]
+  def json?
+    return @_json if instance_variable_defined?(:@_json)
+    
+    @_json = mimetype.include?('json') || decoded_data.lstrip.start_with?('{', '[')
+  end
+  
+  def parse_json(symbolize_names: false, max_nesting: 100)
+    raise ArgumentError, 'not JSON' unless json?
+    JSON.parse(decoded_data, symbolize_names: symbolize_names, max_nesting: max_nesting)
   end
 
-  def parameters
-    return [] if String(match[:mimetype]).empty? && String(match[:parameters]).empty?
-  
-    match[:parameters].split(";").reject(&:empty?)
-  end  
-  
-  def extension
-    match[:extension]
+  private
+
+  def base64_decoded_data
+    return @base64_decoded_data if instance_variable_defined?(:@base64_decoded_data)
+
+    @base64_decoded_data = begin
+      Base64.strict_decode64(data)
+    rescue ArgumentError
+      nil
+    end
   end
 end
