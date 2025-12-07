@@ -190,4 +190,11 @@ class DataUriTest < Minitest::Test
 
     assert_equal "a b+c=d", du.decoded_data
   end
+
+  def test_decoded_data_percent_decodes_svg
+    uri = "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3C%2Fsvg%3E"
+    du = DataUri.new(uri)
+
+    assert_equal '<svg xmlns="http://www.w3.org/2000/svg"></svg>', du.decoded_data
+  end
 end
