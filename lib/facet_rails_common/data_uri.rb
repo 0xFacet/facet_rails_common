@@ -1,5 +1,6 @@
 require "base64"
 require "json"
+require "uri"
 
 class ::DataUri
   REGEXP = %r{
@@ -75,7 +76,7 @@ class ::DataUri
   end
   
   def decoded_data
-    base64? ? base64_decoded_data : data
+    base64? ? base64_decoded_data : URI::DEFAULT_PARSER.unescape(data)
   end
   
   def claims_to_be_base64?

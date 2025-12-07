@@ -161,4 +161,33 @@ class DataUriTest < Minitest::Test
     uri = 'data:,text/plain;rule=other,{"p":"erc-20","op":"mint","tick":"eths","amt":"1000"}'
     refute DataUri.esip6?(uri)
   end
+
+  def test_decoded_data_percent_decodes_space
+    uri = "data:text/plain,Hello%20World"
+    du = DataUri.new(uri)
+
+    assert_equal "Hello%20World", du.data
+    assert_equal "Hello World", du.decoded_data
+  end
+
+  def test_decoded_data_preserves_plus_sign
+    uri = "data:text/plain,Hello+World"
+    du = DataUri.new(uri)
+
+    assert_equal "Hello+World", du.decoded_data
+  end
+
+  def test_decoded_data_percent_decodes_html
+    uri = "data:text/html,%3Ch1%3EHello%3C%2Fh1%3E"
+    du = DataUri.new(uri)
+
+    assert_equal "<h1>Hello</h1>", du.decoded_data
+  end
+
+  def test_decoded_data_percent_decodes_mixed_content
+    uri = "data:text/plain,a%20b+c%3Dd"
+    du = DataUri.new(uri)
+
+    assert_equal "a b+c=d", du.decoded_data
+  end
 end
